@@ -76,7 +76,7 @@ tsne.page <- fluidPage(
                     tabPanel("PCA plot", h3("Click on a point to show the image"), shinycssloaders::withSpinner(plotlyOutput("pca_2d")))
                     
                 )),
-                column(4, plotOutput("clicked_image"))
+                column(4, plotOutput("clicked_image", height = "300px", width = "300px"))
             )
         )
     )
@@ -209,7 +209,7 @@ tsne.server <- function(input, output) {
     example <- matrix(x_train[id,], 28, 28, byrow=T)
     
     image(t(apply(example, 2, rev)), col=grey(seq(0,1,length=256)), xaxt = "n", yaxt = "n")
-  })
+  }, height = 300, width = 300)
   
   output$tsne_plot_3d <- renderPlotly({
     print("updating tsne 3d plot")
