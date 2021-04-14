@@ -1,5 +1,5 @@
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(shiny, tidyverse, plotly, dplyr, Rtsne, shinycssloaders, shinyjs, RCurl, opencv)
+pacman::p_load(shiny, tidyverse, plotly, dplyr, Rtsne, shinycssloaders, shinyjs, RCurl, opencv, Rcpp)
 
 jscode <- "shinyjs.init = function() {
 var signaturePad = new SignaturePad(document.getElementById('signature-pad'), {
