@@ -1,15 +1,5 @@
-library(shiny)
-library(tidyverse)
-library(Rtsne)
-library(plotly)
-library(shinycssloaders)
-
-# drawing componet
-library(shinyjs)
-library(RCurl)
-library(opencv)
-library(dplyr)
-
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(shiny, tidyverse, plotly, dplyr, Rtsne, shinycssloaders, shinyjs, RCurl, opencv)
 
 jscode <- "shinyjs.init = function() {
 var signaturePad = new SignaturePad(document.getElementById('signature-pad'), {
@@ -34,11 +24,27 @@ cancelButton.addEventListener('click', function (event) {
 
 }"
 
+C_knn <- cppFunction(
+  'NumericVector dist(NumericMatrix x, NumericVector y){
+    int n = x.nrow();
+    int m = x.ncol();
+    NumericVector out(n);
+    for(int i = 0; i < n; ++i) {
+      int t  = 0;
+      for(int j = 0; j < m; ++j) {
+          t += pow(x(i,j) - y(j), 2.0);
+      }
+      out[i] = sqrt(t);
+    }
+    return out;
+  }'
+)
+
 # LOAD DATA
-df <- read.csv("data/train.csv", nrows = 10000)
-df <- df %>% sample_frac(0.1)
+df <- read.csv("data/train.csv", nrows = 5000)
 images <- df %>% select (- label)
 target <- df %>% select (label)
+y_train <- target
 
 x_train <- as.matrix(images) / 255
 pca <- prcomp(x_train, rank=64, retx = T)
@@ -58,6 +64,7 @@ tsne.page <- fluidPage(
                      sliderInput("lr", "Learning Rate:", min=200, max=500, value=200, step = 100),
                      sliderInput("iter", "Max iteration:", min=0, max=1000, value=500, step = 100),
                      sliderInput("pca", "PCA embedding dimension:", min=50, max=250, value=50, step = 10),
+                     sliderInput("nexample", "Number of points:", min=500, max=5000, value=500, step = 50),
                      actionButton("start", "Start t-SNE")
                      
         ),
@@ -84,12 +91,19 @@ drawing.page <- fluidPage(
   
   sidebarLayout(
     sidebarPanel(width=3, align="center",
-                 h3("Draw inside the green board"),
+                 h3("Draw inside the board"),
                  div(
                    HTML("<canvas id='signature-pad' class='signature-pad' width=100 height=100, style = 'border:1px solid green'></canvas>"),
                    HTML("<div>
                    <button id='save'>Save</button>
                    <button id='clear'>Clear</button>
+                   <p>The digit is first projected into a lower dimensional space 
+                      and then it is classified using k-NN.
+                    </p>
+                    <p>Flatten an image into a vector is not a so powerful 
+                      technique due to the fact that it is throwing away all the important spatial information.
+                    </p>
+  
                    </div>")
                    
                )
@@ -97,12 +111,14 @@ drawing.page <- fluidPage(
     mainPanel(width = 9,
               fluidRow(
                 column(12, h3("Draw a number and let k-NN do its best ..")),
-                column(12, h5("Your sketch: "), plotOutput("png", height = 300, width = 300)),
+                column(12, h5("Your sketch: "), plotOutput("png", height = "300px", width = "300px")),
                 column(12, h5("k-NN result: ")),
-                column(4, plotOutput("p1")),
-                column(4, plotOutput("p2")),
-                column(4, plotOutput("p3"))
-              )
+                column(4, plotOutput("p1", height = "300px", width = "300px")),
+                column(4, plotOutput("p2", height = "300px", width = "300px")),
+                column(4, plotOutput("p3", height = "300px", width = "300px")),
+                column(4, plotOutput("p4", height = "300px", width = "300px")),
+                column(4, plotOutput("p5", height = "300px", width = "300px"))
+             )
     )
   )
 )
@@ -136,23 +152,32 @@ drawing.server <- function(input, output){
     x <- matrix(t(png::readPNG("mypng.png")), nrow=1, ncol=28*28)
     
     example_pca <- x %*% pca$rotation
-    diff <- sweep(x_train_pca, 2, example_pca)
-    dist <- as.matrix(sqrt(colSums(diff %*% t(diff))))
-    knn <- order(dist)[1:5]
+    # call C++ function
+    knn <- order(C_knn(x_train_pca, example_pca))[1:10]
     
     output$p1 <- renderPlot({
-      m <- matrix(x_train[knn[1], ], nrow = 28, ncol=28)
-      image(m, col=grey(seq(0,1,length=256)), xaxt = "n", yaxt = "n")
+      m <- matrix(x_train[knn[1], ], nrow = 28, ncol=28, byrow = T)
+      image(t(apply(m, 2, rev)), col=grey(seq(0,1,length=256)), xaxt = "n", yaxt = "n")
     }, height = 300, width = 300)
     
     output$p2 <- renderPlot({
-      m <- matrix(x_train[knn[2], ], nrow = 28, ncol=28)
-      image(m, col=grey(seq(0,1,length=256)), xaxt = "n", yaxt = "n")
+      m <- matrix(x_train[knn[2], ], nrow = 28, ncol=28, byrow = T)
+      image(t(apply(m, 2, rev)), col=grey(seq(0,1,length=256)), xaxt = "n", yaxt = "n")
     }, height = 300, width = 300)
     
     output$p3 <- renderPlot({
-      m <- matrix(x_train[knn[3], ], nrow = 28, ncol=28)
-      image(m, col=grey(seq(0,1,length=256)), xaxt = "n", yaxt = "n")
+      m <- matrix(x_train[knn[3], ], nrow = 28, ncol=28, byrow = T)
+      image(t(apply(m, 2, rev)), col=grey(seq(0,1,length=256)), xaxt = "n", yaxt = "n")
+    }, height = 300, width = 300)
+    
+    output$p4 <- renderPlot({
+      m <- matrix(x_train[knn[4], ], nrow = 28, ncol=28, byrow = T)
+      image(t(apply(m, 2, rev)), col=grey(seq(0,1,length=256)), xaxt = "n", yaxt = "n")
+    }, height = 300, width = 300)
+    
+    output$p5 <- renderPlot({
+      m <- matrix(x_train[knn[5], ], nrow = 28, ncol=28, byrow = T)
+      image(t(apply(m, 2, rev)), col=grey(seq(0,1,length=256)), xaxt = "n", yaxt = "n")
     }, height = 300, width = 300)
     
     
@@ -166,12 +191,13 @@ tsne.server <- function(input, output) {
   start_tsne <- eventReactive(input$start, {
     cliecked <- input$start
     "starting"
-    tsne <- Rtsne(images, dims = 3, 
+    subset_images <- images %>% slice(1:input$nexample)
+    tsne <- Rtsne(subset_images, dims = 3, 
                   perplexity=input$perplexity, 
                   initial_dims=input$pca,
                   eta = input$lr,
                   max_iter = input$iter)
-    projection <- data.frame(tsne$Y) %>% bind_cols(target)
+    projection <- data.frame(tsne$Y) %>% bind_cols(target %>% slice(1:input$nexample))
   }, ignoreNULL = F)
   
   
@@ -201,8 +227,8 @@ tsne.server <- function(input, output) {
   
   output$pca_2d <- renderPlotly({
     print("updating pca plot")
-    pca <- prcomp(images, rank=2, retx=T)
-    projection <- data.frame(pca$x) %>% bind_cols(target)
+    pca <- prcomp(images %>% slice(1:600), rank=2, retx=T)
+    projection <- data.frame(pca$x) %>% bind_cols(target %>% slice(1:600))
     plot_ly(projection %>% mutate(id = row_number()), x = ~PC1, y = ~PC2, customdata=~id, color = ~label, colors = colors) %>% 
       add_markers(size=1)
   })
