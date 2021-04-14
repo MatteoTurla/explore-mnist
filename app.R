@@ -2,6 +2,7 @@ library(shiny)
 library(tidyverse)
 library(Rtsne)
 library(plotly)
+library(shinycssloaders)
 
 # drawing componet
 library(shinyjs)
@@ -11,7 +12,6 @@ library(dplyr)
 
 
 jscode <- "shinyjs.init = function() {
-
 var signaturePad = new SignaturePad(document.getElementById('signature-pad'), {
   minWidth: 5,
   maxWidth: 5,
@@ -64,9 +64,9 @@ tsne.page <- fluidPage(
         mainPanel(width = 9,
             fluidRow(
                 column(8, tabsetPanel(
-                    tabPanel("3D plot", h3("Click on a point to show the image"), plotlyOutput("tsne_plot_3d")),
-                    tabPanel("2D plot", h3("Click on a point to show the image"), plotlyOutput("tsne_plot_2d")),
-                    tabPanel("PCA plot", h3("Click on a point to show the image"), plotlyOutput("pca_2d"))
+                    tabPanel("3D plot", h3("Click on a point to show the image"), shinycssloaders::withSpinner(plotlyOutput("tsne_plot_3d"))),
+                    tabPanel("2D plot", h3("Click on a point to show the image"), shinycssloaders::withSpinner(plotlyOutput("tsne_plot_2d"))),
+                    tabPanel("PCA plot", h3("Click on a point to show the image"), shinycssloaders::withSpinner(plotlyOutput("pca_2d")))
                     
                 )),
                 column(4, plotOutput("clicked_image"))
@@ -108,11 +108,10 @@ drawing.page <- fluidPage(
 )
 
 
-ui <- navbarPage("App Title",
-                 tabPanel("Plot", tsne.page),
-                 tabPanel("Summary", drawing.page),
-                 tabPanel("Table")
-)
+ui <- navbarPage("Matteo Turla",
+                 tabPanel("Visualization", tsne.page),
+                 tabPanel("k-NN", drawing.page)
+      )
 
 drawing.server <- function(input, output){
   
@@ -173,7 +172,7 @@ tsne.server <- function(input, output) {
                   eta = input$lr,
                   max_iter = input$iter)
     projection <- data.frame(tsne$Y) %>% bind_cols(target)
-  }, ignoreNULL = T)
+  }, ignoreNULL = F)
   
   
   output$clicked_image <- renderPlot({
