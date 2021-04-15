@@ -1,5 +1,5 @@
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(shiny, tidyverse, plotly, dplyr, Rtsne, shinycssloaders, shinyjs, RCurl, opencv, Rcpp)
+pacman::p_load(shiny, tidyverse, plotly, dplyr, Rtsne, shinycssloaders, shinyjs, RCurl, OpenImageR, Rcpp)
 
 jscode <- "shinyjs.init = function() {
 var signaturePad = new SignaturePad(document.getElementById('signature-pad'), {
@@ -57,29 +57,52 @@ colors = rainbow(length(unique(target$label)))
 names(colors) = unique(target$label)
 
 tsne.page <- fluidPage(
-    titlePanel("Explore MNIST"),
-    sidebarLayout(
-        sidebarPanel(width=3,
-                     sliderInput("perplexity", "Perplexity:", min=5, max=50, value=30),
-                     sliderInput("lr", "Learning Rate:", min=200, max=500, value=200, step = 100),
-                     sliderInput("iter", "Max iteration:", min=0, max=1000, value=500, step = 100),
-                     sliderInput("pca", "PCA embedding dimension:", min=50, max=250, value=50, step = 10),
-                     sliderInput("nexample", "Number of points:", min=500, max=5000, value=500, step = 50),
-                     actionButton("start", "Start t-SNE")
-                     
-        ),
-        mainPanel(width = 9,
-            fluidRow(
+  titlePanel("Explore MNIST"),
+  sidebarLayout(
+    sidebarPanel(width=3,
+                 sliderInput("perplexity", "Perplexity:", min=5, max=50, value=30),
+                 sliderInput("lr", "Learning Rate:", min=10, max=1000, value=200, step = 100),
+                 sliderInput("iter", "Max iteration:", min=100, max=1000, value=500, step = 100),
+                 sliderInput("pca", "PCA embedding dimension:", min=50, max=250, value=50, step = 10),
+                 sliderInput("nexample", "Number of points:", min=500, max=5000, value=500, step = 50),
+                 actionButton("start", "Start t-SNE")
+                 
+    ),
+    mainPanel(width = 9,
+              fluidRow(
                 column(8, tabsetPanel(
-                    tabPanel("3D plot", h3("Click on a point to show the image"), shinycssloaders::withSpinner(plotlyOutput("tsne_plot_3d"))),
-                    tabPanel("2D plot", h3("Click on a point to show the image"), shinycssloaders::withSpinner(plotlyOutput("tsne_plot_2d"))),
-                    tabPanel("PCA plot", h3("Click on a point to show the image"), shinycssloaders::withSpinner(plotlyOutput("pca_2d")))
-                    
+                  tabPanel("3D plot", h3("Click on a point to show the image"), shinycssloaders::withSpinner(plotlyOutput("tsne_plot_3d"))),
+                  tabPanel("2D plot", h3("Click on a point to show the image"), shinycssloaders::withSpinner(plotlyOutput("tsne_plot_2d"))),
+                  tabPanel("PCA plot", h3("Click on a point to show the image"), shinycssloaders::withSpinner(plotlyOutput("pca_2d")))
+                  
                 )),
                 column(4, plotOutput("clicked_image", height = "300px", width = "300px"))
-            )
-        )
+              )
     )
+  ),
+  fluidRow(
+      HTML("<p>t-SNE is a tool to visualize high-dimensional data. 
+      It converts similarities between data points to joint probabilities 
+      and tries to minimize the Kullback-Leibler divergence between the 
+      joint probabilities of the low-dimensional embedding and the high-dimensional data. 
+      t-SNE has a cost function that is not convex, i.e. with different initializations we 
+      can get different results.</p>
+      
+     <p>The <b>perplexity</b> is related to the number of nearest neighbors that is used 
+     in other manifold learning algorithms. Larger datasets usually require a larger perplexity. 
+     Consider selecting a value between 5 and 50. Different values can result in significantly 
+     different results.</p>
+           
+     <p>The <b>learning rate</b> for t-SNE is usually in the range [10.0, 1000.0]. 
+     If the learning rate is too high, the data may look like a ‘ball’ with any point 
+     approximately equidistant from its nearest neighbours. If the learning rate is too low, 
+     most points may look compressed in a dense cloud with few outliers. 
+    If the cost function gets stuck in a bad local minimum increasing the learning rate may help.</p>
+           
+    <p> The <b>PCA</b> is used to reduce the number of dimensions to a reasonable amount (e.g. 50) 
+           if the number of features is very high. This will suppress some noise and speed up the computation 
+           of pairwise distances between samples</p>")
+  )
 )
 
 drawing.page <- fluidPage(
@@ -106,7 +129,7 @@ drawing.page <- fluidPage(
   
                    </div>")
                    
-               )
+                 )
     ),
     mainPanel(width = 9,
               fluidRow(
@@ -118,7 +141,7 @@ drawing.page <- fluidPage(
                 column(4, plotOutput("p3", height = "300px", width = "300px")),
                 column(4, plotOutput("p4", height = "300px", width = "300px")),
                 column(4, plotOutput("p5", height = "300px", width = "300px"))
-             )
+              )
     )
   )
 )
@@ -127,30 +150,27 @@ drawing.page <- fluidPage(
 ui <- navbarPage("Matteo Turla",
                  tabPanel("Visualization", tsne.page),
                  tabPanel("k-NN", drawing.page)
-      )
+)
 
 drawing.server <- function(input, output){
   
   observeEvent(input$id, {
     mybase64 <- input$id
     raw <- base64enc::base64decode(what = substr(mybase64, 23, nchar(mybase64)))
-    png::writePNG(png::readPNG(raw), "mypng.png")
-    image <- ocv_read("mypng.png")
-    image <- ocv_resize(image, width = 28, height = 28)
-    ocv_write(ocv_grayscale(image), "mypng.png")
+    
+    example <- png::readPNG(raw)
+    example <- rowSums(example[,,c(1:3)], dims = 2) / 3
+    example <- resizeImage(example, 28, 28)
     
     output$png <- renderPlot({
       
-      # load in this format for classification
-      example <- matrix(t(png::readPNG("mypng.png")), nrow=1, ncol=28*28)
-      
+      example <- matrix(t(example), nrow=1, ncol=28*28)
       example <- matrix(example, 28, 28, byrow=T)
-  
+      
       image(t(apply(example, 2, rev)), col=grey(seq(0,1,length=256)), xaxt = "n", yaxt = "n")
     }, height = 300, width = 300)
     
-    x <- matrix(t(png::readPNG("mypng.png")), nrow=1, ncol=28*28)
-    
+    x <- matrix(t(example), nrow=1, ncol=28*28)
     example_pca <- x %*% pca$rotation
     # call C++ function
     knn <- order(C_knn(x_train_pca, example_pca))[1:10]
@@ -237,10 +257,10 @@ tsne.server <- function(input, output) {
 # Define server logic required to draw a histogram
 server <- function(input, output) {
   
-    drawing.server(input, output)
+  drawing.server(input, output)
   
-    tsne.server(input, output)
-    
+  tsne.server(input, output)
+  
 }
 
 # Run the application 

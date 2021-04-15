@@ -12,5 +12,8 @@ The **classification page** allow the user to sketch a digit inside a black boar
 
 To speed-up the computation, the euclidean distance between the drew image and the dataset is computed using an Rcpp function.
 
+The app is accessible at: [https://matteoturla.shinyapps.io/nn_shinyio/](https://matteoturla.shinyapps.io/nn_shinyio/)
+
+NOTE: it is required to have a C++ compiler installed.
 
 
