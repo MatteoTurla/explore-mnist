@@ -1,5 +1,5 @@
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(shiny, tidyverse, plotly, dplyr, Rtsne, shinycssloaders, shinyjs, RCurl, OpenImageR, Rcpp)
+pacman::p_load(shiny, tidyverse, plotly, Rtsne, shinycssloaders, shinyjs, RCurl, OpenImageR, Rcpp)
 
 jscode <- "shinyjs.init = function() {
 var signaturePad = new SignaturePad(document.getElementById('signature-pad'), {
@@ -60,7 +60,7 @@ tsne.page <- fluidPage(
   titlePanel("Explore MNIST"),
   sidebarLayout(
     sidebarPanel(width=3,
-                 sliderInput("perplexity", "Perplexity:", min=5, max=50, value=30),
+                 sliderInput("perplexity", "Perplexity:", min=5, max=100, value=30),
                  sliderInput("lr", "Learning Rate:", min=10, max=1000, value=200, step = 100),
                  sliderInput("iter", "Max iteration:", min=100, max=1000, value=500, step = 100),
                  sliderInput("pca", "PCA embedding dimension:", min=50, max=250, value=50, step = 10),
